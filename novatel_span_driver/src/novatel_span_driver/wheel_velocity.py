@@ -27,6 +27,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import rospy
+from std_msgs.msg import Float64
 from nav_msgs.msg import Odometry
 from math import pi
 
@@ -46,6 +47,7 @@ class NovatelWheelVelocity(object):
 
         # SPAN wants to know how much delay is associated with our velocity report.
         # This is specified in milliseconds.
+        self.pacmod_wheel = rospy.get_param("~pacmod_wheel", True)
         self.latency = rospy.get_param("~wheel_velocity_latency", 100)
         max_frequency = rospy.get_param("~wheel_velocity_max_frequency", 1.0)
         self.minimum_period = rospy.Duration(1.0 / max_frequency)
@@ -63,7 +65,11 @@ class NovatelWheelVelocity(object):
         self.cumulative_ticks = 0
         self.last_received_stamp = None
         self.last_sent = None
-        rospy.Subscriber('odom', Odometry, self.odom_handler)
+
+        if self.pacmod_wheel:
+            rospy.Subscriber('odom', Odometry, self.odom_handler)
+        else:
+            rospy.Subscriber('odom', Float64, self.float_handler)    
 
     def odom_handler(self, odom):
         if self.last_received_stamp:
@@ -87,3 +93,26 @@ class NovatelWheelVelocity(object):
                 self.last_sent = odom.header.stamp
 
         self.last_received_stamp = odom.header.stamp
+
+    def float_handler(self, msg):
+        if self.last_received_stamp:
+            # Robot's linear velocity in m/s.
+            velocity = abs(msg.data)
+            velocity_ticks = velocity * self.fake_wheel_ticks / self.circumference
+
+            period = (rospy.Time.now() - self.last_received_stamp).to_sec()
+            self.cumulative_ticks += velocity_ticks * period
+
+            cmd = 'wheelvelocity %d %d %d 0 %f 0 0 %d \r\n' % (
+                self.latency,
+                self.fake_wheel_ticks,
+                int(velocity_ticks),
+                velocity_ticks,
+                self.cumulative_ticks)
+
+            if not self.last_sent or (rospy.Time.now() - self.last_sent) > self.minimum_period:
+                rospy.logdebug("Sending: %s" % repr(cmd))
+                self.port.send(cmd)
+                self.last_sent = rospy.Time.now()
+
+        self.last_received_stamp = rospy.Time.now()

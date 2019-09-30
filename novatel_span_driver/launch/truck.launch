@@ -1,7 +1,7 @@
 <launch>
     <!-- connect_type: TCP/SERIAL -->
     <arg name="connect_type" default="TCP"/>
-    <arg name="ip" default="198.161.1.200"/>
+    <arg name="ip" default="192.168.1.200"/>
     <arg name="port" default="3001"/>
 
     <node name="novatel_span_driver" pkg="novatel_span_driver" type="driver">
@@ -11,16 +11,20 @@
         <rosparam ns="configuration">
             log_request:
                 inspvaxb: 0.02
-                bestposb: 0.02
+                bestposb: 0.05
                 corrimudatab: 0.02
                 inscovb: 1
+            command:
+                applyvehiclebodyrotation: disable
         </rosparam>
 
         <!-- Whether or not the driver should publish a TF, and what frames it should
              be between. This configuration publishes odom -> base_link. -->
         <param name="publish_tf" value="true"/>
+        <param name="map_frame" value="map"/>
         <param name="odom_frame" value="odom"/>
         <param name="base_frame" value="base_link"/>
+        <param name="scenario" value="seaport"/>
 
         <!-- IMU rate; controls scaling of the imu/data topic values. This is a
              function of the underlying hardware IMU rate, which is 100Hz for IMU-CPT. -->
@@ -28,10 +32,14 @@
 
         <!-- Disable this if you don't want SPAN to use wheel encoder data. Remap the odom
              topic if your encoders publish elsewhere. -->
-        <param name="enable_wheel_velocity" value="false"/>
+        <param name="enable_wheel_velocity" value="true"/>
+        <param name="pacmod_wheel" value="true"/>
+            <remap from="odom" to="/pacmod/as_tx/vehicle_speed"/>
 
         <!-- Disable this if you'd like the Odometry to be absolute within the UTM zone
              rather than starting from an arbitrary zero origin. -->
         <param name="zero_start" value="true"/>
     </node>
+
+    <!--<node pkg="tf" type="static_transform_publisher" name="map2odom" args="1 0 0 0 0 0 1 map odom 100" /> -->
 </launch>
