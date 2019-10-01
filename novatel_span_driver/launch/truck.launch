@@ -34,7 +34,7 @@
              topic if your encoders publish elsewhere. -->
         <param name="enable_wheel_velocity" value="true"/>
         <param name="pacmod_wheel" value="true"/>
-            <remap from="odom" to="/pacmod/as_tx/vehicle_speed"/>
+        <remap from="odom" to="/pacmod/as_tx/vehicle_speed"/>
 
         <!-- Disable this if you'd like the Odometry to be absolute within the UTM zone
              rather than starting from an arbitrary zero origin. -->

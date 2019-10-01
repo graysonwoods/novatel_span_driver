@@ -66,7 +66,7 @@ class NovatelWheelVelocity(object):
         self.last_received_stamp = None
         self.last_sent = None
 
-        if self.pacmod_wheel:
+        if not self.pacmod_wheel:
             rospy.Subscriber('odom', Odometry, self.odom_handler)
         else:
             rospy.Subscriber('odom', Float64, self.float_handler)    
@@ -97,7 +97,7 @@ class NovatelWheelVelocity(object):
     def float_handler(self, msg):
         if self.last_received_stamp:
             # Robot's linear velocity in m/s.
-            velocity = abs(msg.data)
+            velocity = abs(1.93*msg.data) #1.93 is correctopm factor
             velocity_ticks = velocity * self.fake_wheel_ticks / self.circumference
 
             period = (rospy.Time.now() - self.last_received_stamp).to_sec()
