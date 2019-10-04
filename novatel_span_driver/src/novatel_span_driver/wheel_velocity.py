@@ -42,8 +42,8 @@ class NovatelWheelVelocity(object):
         # The Odometry message doesn't expose this information to us, so we
         # make up a fake wheel which is rotated and ticked based on how far
         # the odom topic tells us we traveled.
-        self.fake_wheel_diameter = rospy.get_param("~fake_wheel/diameter", 0.33)
-        self.fake_wheel_ticks = rospy.get_param("~fake_wheel/ticks", 1000)
+        self.fake_wheel_diameter = rospy.get_param("~fake_wheel/diameter", 0.31831)
+        self.fake_wheel_ticks = rospy.get_param("~fake_wheel/ticks", 500)
 
         # SPAN wants to know how much delay is associated with our velocity report.
         # This is specified in milliseconds.
@@ -54,12 +54,12 @@ class NovatelWheelVelocity(object):
 
         # Send setup command.
         self.circumference = self.fake_wheel_diameter * pi
-        cmd = 'setwheelparameters %d %f %f' % (
+        cmd = 'setwheelparameters %d %.02f %.03f' % (
             self.fake_wheel_ticks,
             self.circumference,
             self.circumference / self.fake_wheel_ticks)
 
-        rospy.logdebug("Sending: %s" % cmd)
+        rospy.loginfo("Sending: %s" % cmd)
         self.port.send(cmd)
 
         self.cumulative_ticks = 0
@@ -103,21 +103,22 @@ class NovatelWheelVelocity(object):
             period = (rospy.Time.now() - self.last_received_stamp).to_sec()
             self.cumulative_ticks += velocity_ticks * period
 
-            cmd = 'wheelvelocity %d %d %d 0 %f 0 0 %d \r\n' % (
+            # cmd = 'wheelvelocity %d %d %d 0 %f 0 0 %d \r\n' % (
+            #     self.latency,
+            #     self.fake_wheel_ticks,
+            #     int(velocity_ticks),
+            #     velocity_ticks,
+            #     self.cumulative_ticks)
+
+            cmd = 'wheelvelocity %d %d %d 0 0 0 0 %d \r\n' % (
                 self.latency,
                 self.fake_wheel_ticks,
                 int(velocity_ticks),
-                velocity_ticks,
                 self.cumulative_ticks)
 
-            # cmd = 'wheelvelocity %d %d 0 0 0 0 0 %d \r\n' % (
-            #     self.latency,
-            #     self.fake_wheel_ticks,
-            #     self.cumulative_ticks)
-
             if not self.last_sent or (rospy.Time.now() - self.last_sent) > self.minimum_period:
-                rospy.logdebug("Sending: %s" % repr(cmd))
-                self.port.send(cmd)
+                rospy.loginfo("Sending: %s" % repr(cmd))
+                #self.port.send(cmd)
                 self.last_sent = rospy.Time.now()
 
         self.last_received_stamp = rospy.Time.now()

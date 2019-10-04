@@ -16,9 +16,12 @@
                 inscovb: 1
             command:
                 applyvehiclebodyrotation: disable
+                inswheelupdate: enable
         </rosparam>
 
-        <!-- Whether or not the driver should publish a TF, and what frames it should
+        <!--                 applyvehiclebodyrotation: disable
+                inswheelupdate: enable
+        Whether or not the driver should publish a TF, and what frames it should
              be between. This configuration publishes odom -> base_link. -->
         <param name="publish_tf" value="true"/>
         <param name="map_frame" value="map"/>
