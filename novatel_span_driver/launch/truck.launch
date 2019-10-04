@@ -4,7 +4,7 @@
     <arg name="ip" default="192.168.1.200"/>
     <arg name="port" default="3001"/>
 
-    <node name="novatel_span_driver" pkg="novatel_span_driver" type="driver">
+    <node name="novatel_span_driver" pkg="novatel_span_driver" type="driver" output="screen">
         <param name="connect_type" value="$(arg connect_type)"/>
         <param name="ip" value="$(arg ip)"/>
         <param name="port" value="$(arg port)"/>

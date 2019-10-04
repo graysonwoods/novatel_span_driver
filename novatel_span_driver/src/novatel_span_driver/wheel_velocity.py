@@ -110,6 +110,11 @@ class NovatelWheelVelocity(object):
                 velocity_ticks,
                 self.cumulative_ticks)
 
+            # cmd = 'wheelvelocity %d %d 0 0 0 0 0 %d \r\n' % (
+            #     self.latency,
+            #     self.fake_wheel_ticks,
+            #     self.cumulative_ticks)
+
             if not self.last_sent or (rospy.Time.now() - self.last_sent) > self.minimum_period:
                 rospy.logdebug("Sending: %s" % repr(cmd))
                 self.port.send(cmd)
