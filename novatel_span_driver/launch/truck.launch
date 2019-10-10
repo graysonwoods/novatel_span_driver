@@ -13,13 +13,13 @@
                 inspvaxb: 0.02
                 bestposb: 0.05
                 corrimudatab: 0.02
-                inscovb: 1
             command:
                 applyvehiclebodyrotation: disable
                 inswheelupdate: enable
         </rosparam>
 
-        <!--                 applyvehiclebodyrotation: disable
+        <!--    inscovb: 1
+		applyvehiclebodyrotation: disable
                 inswheelupdate: enable
         Whether or not the driver should publish a TF, and what frames it should
              be between. This configuration publishes odom -> base_link. -->
