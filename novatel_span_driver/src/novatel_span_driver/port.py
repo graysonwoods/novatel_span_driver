@@ -60,7 +60,7 @@ class Port(threading.Thread):
         Returns (header, pkt_str)
         Returns None, None when no data. """
 
-        header = msg.CommonHeader()
+        # header = msg.CommonHeader()
         footer = msg.CommonFooter()
 
         try:
@@ -81,7 +81,14 @@ class Port(threading.Thread):
                 raise ValueError("Bad sync2 byte, expected 0x44, received 0x%x" % ord(sync[0]))
             sync = self.sock.recv(1)
             if sync != "\x12":
-                raise ValueError("Bad sync3 byte, expected 0x12, received 0x%x" % ord(sync[0]))
+                if sync == "\x13":
+                    #Then using Binary Short messages
+                    header = msg.CommonShortHeader()
+                else:
+                    raise ValueError("Bad sync3 byte, expected 0x12 or 0x13, received 0x%x" % ord(sync[0]))
+            else:
+                #Using normal binary long header
+                header = msg.CommonHeader()
 
             # Four byte offset to account for 3 sync bytes and one header length byte already consumed.
             header_length = ord(self.sock.recv(1)[0]) - 4

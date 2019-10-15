@@ -156,7 +156,7 @@ class Translator:
 
         fixed_fields = []
         for field in spec.parsed_fields():
-            if field.type == 'novatel_msgs/CommonHeader':
+            if field.type == 'novatel_msgs/CommonHeader' or field.type == 'novatel_msgs/CommonShortHeader':
                 # Deserializing the header happens elsewhere.
                 continue
 

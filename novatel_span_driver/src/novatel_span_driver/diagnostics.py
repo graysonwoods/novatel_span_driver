@@ -30,15 +30,18 @@ import rospy
 import diagnostic_updater
 
 from diagnostic_msgs.msg import DiagnosticStatus
-from novatel_msgs.msg import BESTPOS, INSPVAX
+from novatel_msgs.msg import BESTPOS, INSPVAX, INSPVAS
 
 
 class NovatelDiagnostics(object):
     def __init__(self):
         self.last_bestpos = None
         self.last_inspvax = None
+        self.last_inspvas = None
         rospy.Subscriber("novatel_data/bestpos", BESTPOS, self.bestpos_callback)
         rospy.Subscriber("novatel_data/inspvax", INSPVAX, self.inspvax_callback)
+        rospy.Subscriber("novatel_data/inspvas", INSPVAS, self.inspvas_callback)
+
 
         self.updater = diagnostic_updater.Updater()
         self.updater.setHardwareID("none")
@@ -51,6 +54,10 @@ class NovatelDiagnostics(object):
 
     def inspvax_callback(self, msg):
         self.last_inspvax = msg
+        self.updater.update()
+
+    def inspvas_callback(self, msg):
+        self.last_inspvas = msg
         self.updater.update()
 
     @staticmethod
@@ -99,5 +106,20 @@ class NovatelDiagnostics(object):
         else:
             stat.summary(DiagnosticStatus.ERROR,
                          "No INSPVAX logs received from Novatel system.")
+
+        if self.last_inspvas:
+            if self.last_inspvas.ins_status != INSPVAS.INS_STATUS_SOLUTION_GOOD:
+                stat.summary(DiagnosticStatus.WARN, "INS Solution not GOOD.")
+            else:
+                stat.summary(DiagnosticStatus.OK, "INS Solution GOOD, fix present.")
+
+            stat.add("INS Solution Status",
+                     self.get_status_string(self.last_inspvas, "ins_status"))
+            stat.add("Receiver Status",
+                     self.get_status_bitfield(self.last_inspvas.header, "receiver_status"))
+            self.last_inspvas = None
+        else:
+            stat.summary(DiagnosticStatus.ERROR,
+                         "No INSPVAS logs received from Novatel system.")
 
         return stat

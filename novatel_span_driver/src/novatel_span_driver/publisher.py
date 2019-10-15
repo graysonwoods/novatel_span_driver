@@ -30,7 +30,7 @@ import rospy
 import tf
 import geodesy.utm
 
-from novatel_msgs.msg import BESTPOS, CORRIMUDATA, INSCOV, INSPVAX
+from novatel_msgs.msg import BESTPOS, CORRIMUDATA, CORRIMUDATAS, INSCOV, INSCOVS, INSPVAX, INSPVAS
 from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Quaternion, Point, Pose, Twist
@@ -100,6 +100,8 @@ class NovatelPublisher(object):
             self.tf_broadcast_map = tf.TransformBroadcaster()
 
         self.init = False       # If we've been initialized
+        self.initS = False       # If we've been initialized for INSPVAS
+        self.usingINSPVAS = False #If using INSPVAS, then only use INSPVAX for covariance
         self.origin = Point()   # Where we've started
         self.orientation = [0] * 4  # Empty quaternion until we hear otherwise
         self.orientation_covariance = IMU_ORIENT_COVAR
@@ -107,9 +109,12 @@ class NovatelPublisher(object):
         
         # Subscribed topics
         rospy.Subscriber('novatel_data/bestpos', BESTPOS, self.bestpos_handler)
-        rospy.Subscriber('novatel_data/corrimudata', CORRIMUDATA, self.corrimudata_handler)
-        rospy.Subscriber('novatel_data/inscov', INSCOV, self.inscov_handler)
+        # rospy.Subscriber('novatel_data/corrimudata', CORRIMUDATA, self.corrimudata_handler)
+        rospy.Subscriber('novatel_data/corrimudatas', CORRIMUDATAS, self.corrimudata_handler)
+        # rospy.Subscriber('novatel_data/inscov', INSCOV, self.inscov_handler)
+        rospy.Subscriber('novatel_data/inscovs', INSCOVS, self.inscov_handler)
         rospy.Subscriber('novatel_data/inspvax', INSPVAX, self.inspvax_handler)
+        rospy.Subscriber('novatel_data/inspvas', INSPVAS, self.inspvas_handler)
 
     def bestpos_handler(self, bestpos):
         navsat = NavSatFix()
@@ -174,17 +179,111 @@ class NovatelPublisher(object):
         self.pub_navsatfix.publish(navsat)
 
     def inspvax_handler(self, inspvax):
+        if not self.usingINSPVAS:
+            # Convert the latlong to x,y coordinates and publish an Odometry
+            try:
+                utm_pos = geodesy.utm.fromLatLong(inspvax.latitude, inspvax.longitude)
+            except ValueError:
+                # Probably coordinates out of range for UTM conversion.
+                return
+
+            if not self.init and self.zero_start:
+                self.origin.x = utm_pos.easting
+                self.origin.y = utm_pos.northing
+                self.origin.z = inspvax.altitude
+                self.pub_origin.publish(position=self.origin)
+
+                #Publish tf between map and odom
+                if self.scenario == 'seaport':
+                    print("Seaport: Scenario")
+                    self.map.header.stamp = rospy.Time.now()
+                    self.map.header.frame_id = self.map_frame
+                    self.map.child_frame_id = self.odom_frame
+                    utm_map = geodesy.utm.fromLatLong(30.63518, -96.47684)
+
+                    self.map.pose.pose.position.x = self.origin.x - utm_map.easting 
+                    self.map.pose.pose.position.y = self.origin.y - utm_map.northing
+                    self.map.pose.pose.position.z = 0.0
+
+                    self.map_orientation = tf.transformations.quaternion_from_euler(
+                        0, 0, 0, 'sxyz')
+
+            odom = Odometry()
+            odom.header.stamp = rospy.Time.now()
+            odom.header.frame_id = self.odom_frame
+            odom.child_frame_id = self.base_frame
+            odom.pose.pose.position.x = utm_pos.easting - self.origin.x
+            odom.pose.pose.position.y = utm_pos.northing - self.origin.y
+            odom.pose.pose.position.z = inspvax.altitude - self.origin.z
+
+            # Orientation
+            # Save this on an instance variable, so that it can be published
+            # with the IMU message as well.
+            self.orientation = tf.transformations.quaternion_from_euler(
+                    radians(inspvax.roll),
+                    radians(inspvax.pitch),
+                    -radians(inspvax.azimuth), 'syxz')
+            odom.pose.pose.orientation = Quaternion(*self.orientation)
+            odom.pose.covariance[21] = self.orientation_covariance[0] = pow(inspvax.pitch_std, 2)
+            odom.pose.covariance[28] = self.orientation_covariance[4] = pow(inspvax.roll_std, 2)
+            odom.pose.covariance[35] = self.orientation_covariance[8] = pow(inspvax.azimuth_std, 2)
+
+            # Twist is relative to vehicle frame
+            odom.twist.twist.linear.x = inspvax.east_velocity
+            odom.twist.twist.linear.y = inspvax.north_velocity
+            odom.twist.twist.linear.z = inspvax.up_velocity
+            TWIST_COVAR[0] = pow(2, inspvax.east_velocity_std)
+            TWIST_COVAR[7] = pow(2, inspvax.north_velocity_std)
+            TWIST_COVAR[14] = pow(2, inspvax.up_velocity_std)
+            odom.twist.covariance = TWIST_COVAR
+
+            self.pub_odom.publish(odom)
+
+            # Odometry transform (if required)
+            if self.publish_tf:
+                self.tf_broadcast.sendTransform(
+                    (odom.pose.pose.position.x, odom.pose.pose.position.y,
+                    odom.pose.pose.position.z),
+                    self.orientation,
+                    odom.header.stamp, odom.child_frame_id, odom.header.frame_id)
+                
+                if self.scenario == 'seaport':     
+                    self.tf_broadcast_map.sendTransform(
+                        (self.map.pose.pose.position.x, self.map.pose.pose.position.y,
+                        self.map.pose.pose.position.z),
+                        self.map_orientation,
+                        rospy.Time.now(), self.map.child_frame_id, self.map.header.frame_id)
+
+
+            # Mark that we've received our first fix, and set origin if necessary.
+            self.init = True
+        else:
+            odom.pose.covariance[21] = self.orientation_covariance[0] = pow(inspvax.pitch_std, 2)
+            odom.pose.covariance[28] = self.orientation_covariance[4] = pow(inspvax.roll_std, 2)
+            odom.pose.covariance[35] = self.orientation_covariance[8] = pow(inspvax.azimuth_std, 2)
+
+            # Twist is relative to vehicle frame
+            odom.twist.twist.linear.x = inspvax.east_velocity
+            odom.twist.twist.linear.y = inspvax.north_velocity
+            odom.twist.twist.linear.z = inspvax.up_velocity
+            TWIST_COVAR[0] = pow(2, inspvax.east_velocity_std)
+            TWIST_COVAR[7] = pow(2, inspvax.north_velocity_std)
+            TWIST_COVAR[14] = pow(2, inspvax.up_velocity_std)
+            odom.twist.covariance = TWIST_COVAR            
+
+    def inspvas_handler(self, inspvas):
         # Convert the latlong to x,y coordinates and publish an Odometry
         try:
-            utm_pos = geodesy.utm.fromLatLong(inspvax.latitude, inspvax.longitude)
+            utm_pos = geodesy.utm.fromLatLong(inspvas.latitude, inspvas.longitude)
         except ValueError:
             # Probably coordinates out of range for UTM conversion.
             return
 
-        if not self.init and self.zero_start:
+        if not self.initS and self.zero_start:
+            self.usingINSPVAS = True
             self.origin.x = utm_pos.easting
             self.origin.y = utm_pos.northing
-            self.origin.z = inspvax.altitude
+            self.origin.z = inspvas.altitude
             self.pub_origin.publish(position=self.origin)
 
             #Publish tf between map and odom
@@ -208,27 +307,22 @@ class NovatelPublisher(object):
         odom.child_frame_id = self.base_frame
         odom.pose.pose.position.x = utm_pos.easting - self.origin.x
         odom.pose.pose.position.y = utm_pos.northing - self.origin.y
-        odom.pose.pose.position.z = inspvax.altitude - self.origin.z
+        odom.pose.pose.position.z = inspvas.altitude - self.origin.z
 
         # Orientation
         # Save this on an instance variable, so that it can be published
         # with the IMU message as well.
         self.orientation = tf.transformations.quaternion_from_euler(
-                radians(inspvax.roll),
-                radians(inspvax.pitch),
-                -radians(inspvax.azimuth), 'syxz')
+                radians(inspvas.roll),
+                radians(inspvas.pitch),
+                -radians(inspvas.azimuth), 'syxz')
         odom.pose.pose.orientation = Quaternion(*self.orientation)
-        odom.pose.covariance[21] = self.orientation_covariance[0] = pow(inspvax.pitch_std, 2)
-        odom.pose.covariance[28] = self.orientation_covariance[4] = pow(inspvax.roll_std, 2)
-        odom.pose.covariance[35] = self.orientation_covariance[8] = pow(inspvax.azimuth_std, 2)
+        odom.pose.covariance = POSE_COVAR
 
         # Twist is relative to vehicle frame
-        odom.twist.twist.linear.x = inspvax.east_velocity
-        odom.twist.twist.linear.y = inspvax.north_velocity
-        odom.twist.twist.linear.z = inspvax.up_velocity
-        TWIST_COVAR[0] = pow(2, inspvax.east_velocity_std)
-        TWIST_COVAR[7] = pow(2, inspvax.north_velocity_std)
-        TWIST_COVAR[14] = pow(2, inspvax.up_velocity_std)
+        odom.twist.twist.linear.x = inspvas.east_velocity
+        odom.twist.twist.linear.y = inspvas.north_velocity
+        odom.twist.twist.linear.z = inspvas.up_velocity
         odom.twist.covariance = TWIST_COVAR
 
         self.pub_odom.publish(odom)
@@ -250,7 +344,7 @@ class NovatelPublisher(object):
 
 
         # Mark that we've received our first fix, and set origin if necessary.
-        self.init = True
+        self.initS = True
 
     def corrimudata_handler(self, corrimudata):
         # TODO: Work out these covariances properly. Logs provide covariances in local frame, not body
@@ -258,7 +352,7 @@ class NovatelPublisher(object):
         imu.header.stamp = rospy.Time.now()
         imu.header.frame_id = self.base_frame
 
-        # Populate orientation field with one from inspvax message.
+        # Populate orientation field with one from inspvas message.
         imu.orientation = Quaternion(*self.orientation)
         imu.orientation_covariance = self.orientation_covariance
 
@@ -278,5 +372,50 @@ class NovatelPublisher(object):
         self.pub_imu.publish(imu)
 
     def inscov_handler(self, inscov):
+        
+        # POSE_COVAR = [inscov.pos11, inscov.pos12, inscov.pos13, 0, 0, 0,
+        #                 inscov.pos21, inscov.pos22, inscov.pos33, 0, 0, 0,
+        #                 inscov.pos31, inscov.pos32, inscov.pos33, 0, 0, 0,
+        #                 0, 0, 0, inscov.att11, inscov.att12, inscov.att13,
+        #                 0, 0, 0, inscov.att21, inscov.att22, inscov.att33,
+        #                 0, 0, 0, inscov.att31, inscov.att32, inscov.att33]
+
+        # TWIST_COVAR = [inscov.vel11, inscov.vel12, inscov.vel13, 0, 0, 0,
+        #                 inscov.vel21, inscov.vel22, inscov.vel33, 0, 0, 0,
+        #                 inscov.vel31, inscov.vel32, inscov.vel33, 0, 0, 0,
+        #                 0, 0, 0, inscov.att11, inscov.att12, inscov.att13,
+        #                 0, 0, 0, inscov.att21, inscov.att22, inscov.att33,
+        #                 0, 0, 0, inscov.att31, inscov.att32, inscov.att33]
+
+        POSE_COVAR[0] = inscov.pos11
+        POSE_COVAR[1] = inscov.pos12
+        POSE_COVAR[2] = inscov.pos13
+        POSE_COVAR[6] = inscov.pos21
+        POSE_COVAR[7] = inscov.pos22
+        POSE_COVAR[8] = inscov.pos23
+        POSE_COVAR[12] = inscov.pos31
+        POSE_COVAR[13] = inscov.pos32
+        POSE_COVAR[14] = inscov.pos33
+
+        POSE_COVAR[21] = TWIST_COVAR[21] = inscov.att11
+        POSE_COVAR[22] = TWIST_COVAR[22] = inscov.att12
+        POSE_COVAR[23] = TWIST_COVAR[23] = inscov.att13
+        POSE_COVAR[27] = TWIST_COVAR[27] = inscov.att21
+        POSE_COVAR[28] = TWIST_COVAR[28] = inscov.att22
+        POSE_COVAR[29] = TWIST_COVAR[29] = inscov.att23
+        POSE_COVAR[33] = TWIST_COVAR[33] = inscov.att31
+        POSE_COVAR[34] = TWIST_COVAR[34] = inscov.att32
+        POSE_COVAR[35] = TWIST_COVAR[35] = inscov.att33
+
+        TWIST_COVAR[0] = inscov.vel11
+        TWIST_COVAR[1] = inscov.vel12
+        TWIST_COVAR[2] = inscov.vel13
+        TWIST_COVAR[6] = inscov.vel21
+        TWIST_COVAR[7] = inscov.vel22
+        TWIST_COVAR[8] = inscov.vel23
+        TWIST_COVAR[12] = inscov.vel31
+        TWIST_COVAR[13] = inscov.vel32
+        TWIST_COVAR[14] = inscov.vel33
+
         # TODO: Supply this data in the IMU and Odometry messages.
         pass

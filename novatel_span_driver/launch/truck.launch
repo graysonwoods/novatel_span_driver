@@ -10,15 +10,17 @@
         <param name="port" value="$(arg port)"/>
         <rosparam ns="configuration">
             log_request:
-                inspvaxb: 0.02
-                bestposb: 0.05
-                corrimudatab: 0.02
+                inspvasb: 0.02
+                inscovsb: 1
+                bestposb: 0.1
+                corrimudatasb: 0.05
             command:
                 applyvehiclebodyrotation: disable
                 inswheelupdate: enable
         </rosparam>
 
-        <!--    inscovb: 1
+        <!--    inspvaxb: 0.02
+            inscovb: 1
 		applyvehiclebodyrotation: disable
                 inswheelupdate: enable
         Whether or not the driver should publish a TF, and what frames it should

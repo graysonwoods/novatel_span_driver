@@ -13,10 +13,14 @@ add_message_files(
   Ack.msg
   CommonFooter.msg
   CommonHeader.msg
+  CommonShortHeader.msg
   BESTPOS.msg
   CORRIMUDATA.msg
+  CORRIMUDATAS.msg
   INSCOV.msg
-  INSPVAX.msg 
+  INSCOVS.msg
+  INSPVAX.msg
+  INSPVAS.msg 
 )
 
 generate_messages(
