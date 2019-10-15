@@ -10,16 +10,20 @@
         <param name="port" value="$(arg port)"/>
         <rosparam ns="configuration">
             log_request:
-                inspvasb: 0.02
                 inscovsb: 1
                 bestposb: 0.1
                 corrimudatasb: 0.05
+                inspvasb: 0.02
             command:
                 applyvehiclebodyrotation: disable
                 inswheelupdate: enable
         </rosparam>
 
-        <!--    inspvaxb: 0.02
+        <!--                 
+                       inscovb: 1
+                bestposb: 0.1
+                corrimudatab: 0.05
+                inspvaxb: 0.02
             inscovb: 1
 		applyvehiclebodyrotation: disable
                 inswheelupdate: enable

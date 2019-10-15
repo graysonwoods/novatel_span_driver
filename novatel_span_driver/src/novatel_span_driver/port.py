@@ -60,7 +60,7 @@ class Port(threading.Thread):
         Returns (header, pkt_str)
         Returns None, None when no data. """
 
-        # header = msg.CommonHeader()
+        header = msg.CommonHeader()
         footer = msg.CommonFooter()
 
         try:
@@ -82,19 +82,20 @@ class Port(threading.Thread):
             sync = self.sock.recv(1)
             if sync != "\x12":
                 if sync == "\x13":
-                    #Then using Binary Short messages
+                    # rospy.logwarn("Recieving Short Message")
+                    # Then using Binary Short messages
                     header = msg.CommonShortHeader()
+                    header_length = header.translator().size
+                    # rospy.logwarn("Header Length expected: %d ", header.translator().size)
+
                 else:
                     raise ValueError("Bad sync3 byte, expected 0x12 or 0x13, received 0x%x" % ord(sync[0]))
             else:
-                #Using normal binary long header
-                header = msg.CommonHeader()
-
-            # Four byte offset to account for 3 sync bytes and one header length byte already consumed.
-            header_length = ord(self.sock.recv(1)[0]) - 4
-            if header_length != header.translator().size:
-                raise ValueError("Bad header length. Expected %d, got %d" %
-                                 (header.translator().size, header_length))
+                # Four byte offset to account for 3 sync bytes and one header length byte already consumed.
+                header_length = ord(self.sock.recv(1)[0]) - 4
+                if header_length != header.translator().size:
+                    raise ValueError("Bad header length. Expected %d, got %d" %
+                                    (header.translator().size, header_length))
 
         except (socket.timeout, serial.SerialTimeoutException) as e:
             rospy.logwarn("Connection timeout... %s" % str(e))
@@ -119,7 +120,7 @@ class Port(threading.Thread):
         pad_count = -msg_buff.tell() % 4
         msg_buff.write("\x00" * pad_count)
 
-        footer = msg.CommonFooter(end=msg.CommonFooter.END)
+        footer = msg.CommonFooter(end = msg.CommonFooter.END)
         header.length = msg_buff.tell() + footer.translator().size
 
         # Write header and message to main buffer.

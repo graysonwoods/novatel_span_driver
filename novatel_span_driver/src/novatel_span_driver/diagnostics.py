@@ -115,8 +115,6 @@ class NovatelDiagnostics(object):
 
             stat.add("INS Solution Status",
                      self.get_status_string(self.last_inspvas, "ins_status"))
-            stat.add("Receiver Status",
-                     self.get_status_bitfield(self.last_inspvas.header, "receiver_status"))
             self.last_inspvas = None
         else:
             stat.summary(DiagnosticStatus.ERROR,

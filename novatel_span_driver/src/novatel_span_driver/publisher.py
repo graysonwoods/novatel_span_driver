@@ -30,7 +30,7 @@ import rospy
 import tf
 import geodesy.utm
 
-from novatel_msgs.msg import BESTPOS, CORRIMUDATA, CORRIMUDATAS, INSCOV, INSCOVS, INSPVAX, INSPVAS
+from novatel_msgs.msg import BESTPOS, INSCOV, INSCOVS, INSPVAS, CORRIMUDATA, CORRIMUDATAS, INSPVAX 
 from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Quaternion, Point, Pose, Twist
@@ -113,7 +113,7 @@ class NovatelPublisher(object):
         rospy.Subscriber('novatel_data/corrimudatas', CORRIMUDATAS, self.corrimudata_handler)
         # rospy.Subscriber('novatel_data/inscov', INSCOV, self.inscov_handler)
         rospy.Subscriber('novatel_data/inscovs', INSCOVS, self.inscov_handler)
-        rospy.Subscriber('novatel_data/inspvax', INSPVAX, self.inspvax_handler)
+        # rospy.Subscriber('novatel_data/inspvax', INSPVAX, self.inspvax_handler)
         rospy.Subscriber('novatel_data/inspvas', INSPVAS, self.inspvas_handler)
 
     def bestpos_handler(self, bestpos):

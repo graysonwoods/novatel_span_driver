@@ -37,7 +37,7 @@ class Monitor(threading.Thread):
     def run(self):
         while not self.finish:
             rospy.sleep(1.0)
-            for name, port in ports.items():
+            for name, port in self.ports.items():
                 if not port.is_alive():
                     rospy.logerr("Port %s thread died. Signalling node shutdown." % name)
                     rospy.signal_shutdown("Node lost thread.")
