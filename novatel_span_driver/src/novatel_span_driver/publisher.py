@@ -195,18 +195,24 @@ class NovatelPublisher(object):
 
                 #Publish tf between map and odom
                 if self.scenario == 'seaport':
-                    print("Seaport: Scenario")
-                    self.map.header.stamp = rospy.Time.now()
-                    self.map.header.frame_id = self.map_frame
-                    self.map.child_frame_id = self.odom_frame
+                    rospy.loginfo("Scenario: Scenario")
                     utm_map = geodesy.utm.fromLatLong(30.63518, -96.47684)
+                elif self.scenario == 'lane_change':
+                    rospy.loginfo("Scenario: Lane Change")
+                    utm_map = geodesy.utm.fromLatLong(30.626184, -96.481977)
+                else:
+                    rospy.logwarn("Unrecognized Scenario. Using Map = Odom")
+                    utm_map = utm_pos
 
-                    self.map.pose.pose.position.x = self.origin.x - utm_map.easting 
-                    self.map.pose.pose.position.y = self.origin.y - utm_map.northing
-                    self.map.pose.pose.position.z = 0.0
+                self.map.header.stamp = rospy.Time.now()
+                self.map.header.frame_id = self.map_frame
+                self.map.child_frame_id = self.odom_frame
+                self.map.pose.pose.position.x = self.origin.x - utm_map.easting 
+                self.map.pose.pose.position.y = self.origin.y - utm_map.northing
+                self.map.pose.pose.position.z = 0.0
 
-                    self.map_orientation = tf.transformations.quaternion_from_euler(
-                        0, 0, 0, 'sxyz')
+                self.map_orientation = tf.transformations.quaternion_from_euler(
+                    0, 0, 0, 'sxyz')
 
             odom = Odometry()
             odom.header.stamp = rospy.Time.now()
@@ -246,13 +252,12 @@ class NovatelPublisher(object):
                     odom.pose.pose.position.z),
                     self.orientation,
                     odom.header.stamp, odom.child_frame_id, odom.header.frame_id)
-                
-                if self.scenario == 'seaport':     
-                    self.tf_broadcast_map.sendTransform(
-                        (self.map.pose.pose.position.x, self.map.pose.pose.position.y,
-                        self.map.pose.pose.position.z),
-                        self.map_orientation,
-                        rospy.Time.now(), self.map.child_frame_id, self.map.header.frame_id)
+                 
+                self.tf_broadcast_map.sendTransform(
+                    (self.map.pose.pose.position.x, self.map.pose.pose.position.y,
+                    self.map.pose.pose.position.z),
+                    self.map_orientation,
+                    rospy.Time.now(), self.map.child_frame_id, self.map.header.frame_id)
 
 
             # Mark that we've received our first fix, and set origin if necessary.
@@ -340,13 +345,12 @@ class NovatelPublisher(object):
                  odom.pose.pose.position.z),
                 self.orientation,
                 odom.header.stamp, odom.child_frame_id, odom.header.frame_id)
-            
-            if self.scenario == 'seaport':     
-                self.tf_broadcast_map.sendTransform(
-                    (self.map.pose.pose.position.x, self.map.pose.pose.position.y,
-                    self.map.pose.pose.position.z),
-                    self.map_orientation,
-                    rospy.Time.now(), self.map.child_frame_id, self.map.header.frame_id)
+              
+            self.tf_broadcast_map.sendTransform(
+                (self.map.pose.pose.position.x, self.map.pose.pose.position.y,
+                self.map.pose.pose.position.z),
+                self.map_orientation,
+                rospy.Time.now(), self.map.child_frame_id, self.map.header.frame_id)
 
 
         # Mark that we've received our first fix, and set origin if necessary.
