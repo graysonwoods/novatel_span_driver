@@ -33,7 +33,7 @@
         <param name="map_frame" value="map"/>
         <param name="odom_frame" value="odom"/>
         <param name="base_frame" value="base_link"/>
-        <param name="scenario" value="none"/>
+        <param name="/scenario" value="none"/>
 
         <!-- IMU rate; controls scaling of the imu/data topic values. This is a
              function of the underlying hardware IMU rate, which is 100Hz for IMU-CPT. -->

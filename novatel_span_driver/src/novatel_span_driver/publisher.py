@@ -331,9 +331,17 @@ class NovatelPublisher(object):
         odom.pose.covariance = POSE_COVAR
 
         # Twist is relative to vehicle frame
-        odom.twist.twist.linear.x = inspvas.east_velocity
-        odom.twist.twist.linear.y = inspvas.north_velocity
-        odom.twist.twist.linear.z = inspvas.up_velocity
+        q2 = [inspvas.east_velocity, inspvas.north_velocity, inspvas.up_velocity, 0.0]
+        vel = tf.transformations.quaternion_multiply( \
+            tf.transformations.quaternion_multiply(self.orientation, q2), \
+            tf.transformations.quaternion_conjugate(self.orientation))       
+        odom.twist.twist.linear.x = vel[0]
+        odom.twist.twist.linear.y = vel[1]
+        odom.twist.twist.linear.z = vel[2]
+
+        # odom.twist.twist.linear.x = inspvas.east_velocity
+        # odom.twist.twist.linear.y = inspvas.north_velocity
+        # odom.twist.twist.linear.z = inspvas.up_velocity
         odom.twist.covariance = TWIST_COVAR
 
         self.pub_odom.publish(odom)
