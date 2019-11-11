@@ -28,12 +28,13 @@
 
 import rospy
 import tf
+import tf2_ros
 import geodesy.utm
 
 from novatel_msgs.msg import BESTPOS, INSCOV, INSCOVS, INSPVAS, CORRIMUDATA, CORRIMUDATAS, INSPVAX 
 from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Quaternion, Point, Pose, Twist
+from geometry_msgs.msg import Quaternion, Point, Pose, Twist, TransformStamped
 
 from math import radians, pow
 
@@ -96,8 +97,8 @@ class NovatelPublisher(object):
         self.pub_navsatfix = rospy.Publisher('navsat/fix', NavSatFix, queue_size=1)
 
         if self.publish_tf:
-            self.tf_broadcast = tf.TransformBroadcaster()
-            self.tf_broadcast_map = tf.TransformBroadcaster()
+            self.tf_broadcast = tf2_ros.TransformBroadcaster()
+            self.tf_broadcast_map = tf2_ros.StaticTransformBroadcaster()
 
         self.init = False       # If we've been initialized
         self.initS = False       # If we've been initialized for INSPVAS
@@ -105,8 +106,10 @@ class NovatelPublisher(object):
         self.origin = Point()   # Where we've started
         self.orientation = [0] * 4  # Empty quaternion until we hear otherwise
         self.orientation_covariance = IMU_ORIENT_COVAR
-        self.map_orientation = [0] * 4  # Empty quaternion until we hear otherwise
-        
+        self.map_orientation = [0, 0, 0 , 1]  # Empty quaternion until we hear otherwise
+        self.mto = TransformStamped()
+        self.otb = TransformStamped()
+
         # Subscribed topics
         rospy.Subscriber('novatel_data/bestpos', BESTPOS, self.bestpos_handler)
         # rospy.Subscriber('novatel_data/corrimudata', CORRIMUDATA, self.corrimudata_handler)
@@ -191,7 +194,7 @@ class NovatelPublisher(object):
                 self.origin.x = utm_pos.easting
                 self.origin.y = utm_pos.northing
                 self.origin.z = inspvax.altitude
-                self.pub_origin.publish(position=self.origin)
+                self.pub_origin.publish(position=self.origin, quaternion = self.map_orientation)
 
                 #Publish tf between map and odom
                 if self.scenario == 'seaport':
@@ -204,15 +207,18 @@ class NovatelPublisher(object):
                     rospy.logwarn("Unrecognized Scenario. Using Map = Odom")
                     utm_map = utm_pos
 
-                self.map.header.stamp = rospy.Time.now()
-                self.map.header.frame_id = self.map_frame
-                self.map.child_frame_id = self.odom_frame
-                self.map.pose.pose.position.x = self.origin.x - utm_map.easting 
-                self.map.pose.pose.position.y = self.origin.y - utm_map.northing
-                self.map.pose.pose.position.z = 0.0
-
-                self.map_orientation = tf.transformations.quaternion_from_euler(
-                    0, 0, 0, 'sxyz')
+                if self.publish_tf:
+                    self.mto.header.stamp = rospy.Time.now()
+                    self.mto.header.frame_id = self.map_frame
+                    self.mto.child_frame_id = self.odom_frame
+                    self.mto.transform.translation.x = self.origin.x - utm_map.easting  
+                    self.mto.transform.translation.y = self.origin.y - utm_map.northing
+                    self.mto.transform.translation.z = 0.0
+                    self.mto.transform.rotation.x = self.map_orientation[0]
+                    self.mto.transform.rotation.y = self.map_orientation[1]
+                    self.mto.transform.rotation.z = self.map_orientation[2]
+                    self.mto.transform.rotation.w = self.map_orientation[3]
+                    self.tf_broadcast_map.sendTransform(self.mto)
 
             odom = Odometry()
             odom.header.stamp = rospy.Time.now()
@@ -247,18 +253,14 @@ class NovatelPublisher(object):
 
             # Odometry transform (if required)
             if self.publish_tf:
-                self.tf_broadcast.sendTransform(
-                    (odom.pose.pose.position.x, odom.pose.pose.position.y,
-                    odom.pose.pose.position.z),
-                    self.orientation,
-                    odom.header.stamp, odom.child_frame_id, odom.header.frame_id)
-                 
-                self.tf_broadcast_map.sendTransform(
-                    (self.map.pose.pose.position.x, self.map.pose.pose.position.y,
-                    self.map.pose.pose.position.z),
-                    self.map_orientation,
-                    rospy.Time.now(), self.map.child_frame_id, self.map.header.frame_id)
-
+                self.otb.header.stamp = rospy.Time.now()
+                self.otb.header.frame_id = self.odom_frame
+                self.otb.child_frame_id = self.base_frame
+                self.otb.transform.translation.x = odom.pose.pose.position.x
+                self.otb.transform.translation.y = odom.pose.pose.position.y
+                self.otb.transform.translation.z = odom.pose.pose.position.z
+                self.otb.transform.rotation = odom.pose.pose.orientation
+                self.tf_broadcast.sendTransform(self.otb)
 
             # Mark that we've received our first fix, and set origin if necessary.
             self.init = True
@@ -289,7 +291,7 @@ class NovatelPublisher(object):
             self.origin.x = utm_pos.easting
             self.origin.y = utm_pos.northing
             self.origin.z = inspvas.altitude
-            self.pub_origin.publish(position=self.origin)
+            self.pub_origin.publish(position=self.origin, quaternion = self.map_orientation)
 
             #Publish tf between map and odom
             if self.scenario == 'seaport':
@@ -301,16 +303,18 @@ class NovatelPublisher(object):
             else:
                 rospy.logwarn("Unrecognized Scenario. Using Map = Odom")
                 utm_map = utm_pos
-
-            self.map.header.stamp = rospy.Time.now()
-            self.map.header.frame_id = self.map_frame
-            self.map.child_frame_id = self.odom_frame
-            self.map.pose.pose.position.x = self.origin.x - utm_map.easting 
-            self.map.pose.pose.position.y = self.origin.y - utm_map.northing
-            self.map.pose.pose.position.z = 0.0
-
-            self.map_orientation = tf.transformations.quaternion_from_euler(
-                0, 0, 0, 'sxyz')
+            if self.publish_tf:
+                self.mto.header.stamp = rospy.Time.now()
+                self.mto.header.frame_id = self.map_frame
+                self.mto.child_frame_id = self.odom_frame
+                self.mto.transform.translation.x = self.origin.x - utm_map.easting  
+                self.mto.transform.translation.y = self.origin.y - utm_map.northing
+                self.mto.transform.translation.z = 0.0
+                self.mto.transform.rotation.x = self.map_orientation[0]
+                self.mto.transform.rotation.y = self.map_orientation[1]
+                self.mto.transform.rotation.z = self.map_orientation[2]
+                self.mto.transform.rotation.w = self.map_orientation[3]
+                self.tf_broadcast_map.sendTransform(self.mto)
 
         odom = Odometry()
         odom.header.stamp = rospy.Time.now()
@@ -348,18 +352,14 @@ class NovatelPublisher(object):
 
         # Odometry transform (if required)
         if self.publish_tf:
-            self.tf_broadcast.sendTransform(
-                (odom.pose.pose.position.x, odom.pose.pose.position.y,
-                 odom.pose.pose.position.z),
-                self.orientation,
-                odom.header.stamp, odom.child_frame_id, odom.header.frame_id)
-              
-            self.tf_broadcast_map.sendTransform(
-                (self.map.pose.pose.position.x, self.map.pose.pose.position.y,
-                self.map.pose.pose.position.z),
-                self.map_orientation,
-                rospy.Time.now(), self.map.child_frame_id, self.map.header.frame_id)
-
+            self.otb.header.stamp = rospy.Time.now()
+            self.otb.header.frame_id = self.odom_frame
+            self.otb.child_frame_id = self.base_frame
+            self.otb.transform.translation.x = odom.pose.pose.position.x
+            self.otb.transform.translation.y = odom.pose.pose.position.y
+            self.otb.transform.translation.z = odom.pose.pose.position.z
+            self.otb.transform.rotation = odom.pose.pose.orientation
+            self.tf_broadcast.sendTransform(self.otb)
 
         # Mark that we've received our first fix, and set origin if necessary.
         self.initS = True
