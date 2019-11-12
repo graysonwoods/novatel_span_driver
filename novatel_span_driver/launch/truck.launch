@@ -50,5 +50,16 @@
         <param name="zero_start" value="true"/>
     </node>
 
+    <param name="/vehicle/steering_ratio" type="double" value="25.6"/>
+    <param name="/vehicle/control_rate" type="double" value="30.0"/>
+    <param name="/vehicle/max_steering" type="double" value="11.0"/>
+    <param name="/vehicle/max_steering_rate" type="double" value="2.0"/>
+    <param name="/vehicle/wheelbase" type="double" value="5.81"/>
+    <param name="/vehicle/front_edge" type="double" value="1.35"/>
+    <param name="/vehicle/back_edge" type="double" value="1.85"/>
+    <param name="/vehicle/width" type="double" value="2.42"/>
+    <param name="/vehicle/trailer_wheelbase" type="double" value="11.0"/>
+    <param name="/vehicle/trailer_front_edge" type="double" value="1.35"/>
+    <param name="/vehicle/trailer_back_edge" type="double" value="1.4"/>
     <!--<node pkg="tf" type="static_transform_publisher" name="map2odom" args="1 0 0 0 0 0 1 map odom 100" /> -->
 </launch>
