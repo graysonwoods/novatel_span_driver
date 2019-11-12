@@ -194,7 +194,7 @@ class NovatelPublisher(object):
                 self.origin.x = utm_pos.easting
                 self.origin.y = utm_pos.northing
                 self.origin.z = inspvax.altitude
-                self.pub_origin.publish(position=self.origin, quaternion = self.map_orientation)
+                self.pub_origin.publish(position=self.origin, orientation = Quaternion(*self.map_orientation))
 
                 #Publish tf between map and odom
                 if self.scenario == 'seaport':
@@ -291,7 +291,7 @@ class NovatelPublisher(object):
             self.origin.x = utm_pos.easting
             self.origin.y = utm_pos.northing
             self.origin.z = inspvas.altitude
-            self.pub_origin.publish(position=self.origin, quaternion = self.map_orientation)
+            self.pub_origin.publish(position=self.origin, orientation = Quaternion(*self.map_orientation))
 
             #Publish tf between map and odom
             if self.scenario == 'seaport':
@@ -360,7 +360,7 @@ class NovatelPublisher(object):
             self.otb.transform.translation.z = odom.pose.pose.position.z
             self.otb.transform.rotation = odom.pose.pose.orientation
             self.tf_broadcast.sendTransform(self.otb)
-
+        
         # Mark that we've received our first fix, and set origin if necessary.
         self.initS = True
 
