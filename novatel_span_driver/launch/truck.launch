@@ -58,11 +58,12 @@
     <param name="/vehicle/front_edge" type="double" value="1.35"/>
     <param name="/vehicle/back_edge" type="double" value="1.85"/>
     <param name="/vehicle/width" type="double" value="2.42"/>
-    <param name="/vehicle/trailer_wheelbase" type="double" value="11.0"/>
+    <param name="/vehicle/trailer_wheelbase" type="double" value="7.8"/>
     <param name="/vehicle/trailer_front_edge" type="double" value="1.35"/>
-    <param name="/vehicle/trailer_back_edge" type="double" value="1.4"/>
+    <param name="/vehicle/trailer_back_edge" type="double" value="1.5"/>
     <param name="/vehicle/max_lat_accel" type="double" value="2.5"/>
     <param name="/vehicle/max_long_decel" type="double" value="2.0"/>
     <param name="/vehicle/max_long_accel" type="double" value="0.6"/>
+    <param name="/vehicle/stanley_kp" type="double" value="0.6"/>
     <!--<node pkg="tf" type="static_transform_publisher" name="map2odom" args="1 0 0 0 0 0 1 map odom 100" /> -->
 </launch>
