@@ -78,7 +78,7 @@ class NovatelPublisher(object):
     def __init__(self):
         # Parameters
         self.publish_tf = rospy.get_param('~publish_tf', False)
-        self.scenario = rospy.get_param('~scenario', 'None')
+        self.scenario = rospy.get_param('/scenario', 'None')
         self.map_frame = rospy.get_param('~map_frame', 'map')
         self.map = Odometry()
         self.odom_frame = rospy.get_param('~odom_frame', 'odom_combined')
@@ -194,13 +194,14 @@ class NovatelPublisher(object):
                 self.origin.x = utm_pos.easting
                 self.origin.y = utm_pos.northing
                 self.origin.z = inspvax.altitude
+                
                 self.pub_origin.publish(position=self.origin, orientation = Quaternion(*self.map_orientation))
 
                 #Publish tf between map and odom
-                if self.scenario == 'seaport':
+                if self.scenario == "seaport":
                     rospy.loginfo("Scenario: Scenario")
                     utm_map = geodesy.utm.fromLatLong(30.63518, -96.47684)
-                elif self.scenario == 'lane_change':
+                elif self.scenario == "lane_change":
                     rospy.loginfo("Scenario: Lane Change")
                     utm_map = geodesy.utm.fromLatLong(30.626184, -96.481977)
                 else:
@@ -292,14 +293,19 @@ class NovatelPublisher(object):
             self.origin.y = utm_pos.northing
             self.origin.z = inspvas.altitude
             self.pub_origin.publish(position=self.origin, orientation = Quaternion(*self.map_orientation))
-
+            
             #Publish tf between map and odom
-            if self.scenario == 'seaport':
+            if self.scenario == "seaport":
                 rospy.loginfo("Scenario: Scenario")
                 utm_map = geodesy.utm.fromLatLong(30.63518, -96.47684)
-            elif self.scenario == 'lane_change':
+            elif self.scenario == "lane_change":
                 rospy.loginfo("Scenario: Lane Change")
-                utm_map = geodesy.utm.fromLatLong(30.626184, -96.481977)
+                # utm_map = geodesy.utm.fromLatLong(30.626184, -96.481977)
+                utm_map = geodesy.utm.UTMPoint(easting=741356.036, \
+                northing=3390791.560, band="14R")
+                # print("Map: ",utm_map.toPoint(), ", Actual: ", utm_pos.toPoint())
+                # utm_map.easting = 741356.036
+                # utm_map.northing = 3390791.560
             else:
                 rospy.logwarn("Unrecognized Scenario. Using Map = Odom")
                 utm_map = utm_pos
