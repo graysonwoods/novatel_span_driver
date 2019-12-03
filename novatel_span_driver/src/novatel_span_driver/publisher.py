@@ -34,9 +34,10 @@ import geodesy.utm
 from novatel_msgs.msg import BESTPOS, INSCOV, INSCOVS, INSPVAS, CORRIMUDATA, CORRIMUDATAS, INSPVAX 
 from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Quaternion, Point, Pose, Twist, TransformStamped
+from geometry_msgs.msg import Quaternion, Point, Pose, Twist, PoseStamped, TransformStamped
 
-from math import radians, pow
+from math import radians, pow, sin
+from numpy import cross, dot, multiply, pi
 
 # FIXED COVARIANCES
 # TODO: Work these out...
@@ -83,6 +84,7 @@ class NovatelPublisher(object):
         self.map = Odometry()
         self.odom_frame = rospy.get_param('~odom_frame', 'odom_combined')
         self.base_frame = rospy.get_param('~base_frame', 'base_link')
+        self.LT = rospy.get_param('/vehicle/trailer_wheelbase', 7.8)
 
         # When True, UTM odom x, y pose will be published with respect to the
         # first coordinate received.
@@ -95,6 +97,8 @@ class NovatelPublisher(object):
         self.pub_odom = rospy.Publisher('navsat/odom', Odometry, queue_size=1)
         self.pub_origin = rospy.Publisher('navsat/origin', Pose, queue_size=1, latch=True)
         self.pub_navsatfix = rospy.Publisher('navsat/fix', NavSatFix, queue_size=1)
+        self.pub_trailer_pose = rospy.Publisher(
+            "/ats/trailer_pose", PoseStamped, queue_size=1)
 
         if self.publish_tf:
             self.tf_broadcast = tf2_ros.TransformBroadcaster()
@@ -105,6 +109,8 @@ class NovatelPublisher(object):
         self.usingINSPVAS = False #If using INSPVAS, then only use INSPVAX for covariance
         self.origin = Point()   # Where we've started
         self.orientation = [0] * 4  # Empty quaternion until we hear otherwise
+        self.trailer_yaw = 0.0
+        self.dt = 0.02 # This is update rate from the SPAN system
         self.orientation_covariance = IMU_ORIENT_COVAR
         self.map_orientation = [0, 0, 0 , 1]  # Empty quaternion until we hear otherwise
         self.mto = TransformStamped()
@@ -286,6 +292,13 @@ class NovatelPublisher(object):
         except ValueError:
             # Probably coordinates out of range for UTM conversion.
             return
+            
+        # Orientation
+        # Save this on an instance variable, so that it can be published
+        self.orientation = tf.transformations.quaternion_from_euler(
+                radians(inspvas.roll),
+                radians(inspvas.pitch),
+                -radians(inspvas.azimuth), 'syxz')
 
         if not self.initS and self.zero_start:
             self.usingINSPVAS = True
@@ -320,6 +333,7 @@ class NovatelPublisher(object):
                 self.mto.transform.rotation.y = self.map_orientation[1]
                 self.mto.transform.rotation.z = self.map_orientation[2]
                 self.mto.transform.rotation.w = self.map_orientation[3]
+                self.trailer_yaw = self.orientation[2]
                 self.tf_broadcast_map.sendTransform(self.mto)
 
         odom = Odometry()
@@ -329,32 +343,38 @@ class NovatelPublisher(object):
         odom.pose.pose.position.x = utm_pos.easting - self.origin.x
         odom.pose.pose.position.y = utm_pos.northing - self.origin.y
         odom.pose.pose.position.z = inspvas.altitude - self.origin.z
-
-        # Orientation
-        # Save this on an instance variable, so that it can be published
-        # with the IMU message as well.
-        self.orientation = tf.transformations.quaternion_from_euler(
-                radians(inspvas.roll),
-                radians(inspvas.pitch),
-                -radians(inspvas.azimuth), 'syxz')
         odom.pose.pose.orientation = Quaternion(*self.orientation)
         odom.pose.covariance = POSE_COVAR
 
         # Twist is relative to vehicle frame
-        q2 = [inspvas.east_velocity, inspvas.north_velocity, inspvas.up_velocity, 0.0]
-        vel = tf.transformations.quaternion_multiply( \
-            tf.transformations.quaternion_multiply(self.orientation, q2), \
-            tf.transformations.quaternion_conjugate(self.orientation))       
-        odom.twist.twist.linear.x = vel[0]
-        odom.twist.twist.linear.y = vel[1]
+        # https://gamedev.stackexchange.com/questions/28395/rotating-vector3-by-a-quaternion
+        # vel_ENU = [inspvas.east_velocity, inspvas.north_velocity, inspvas.up_velocity, 0.0]
+        # vel = tf.transformations.quaternion_multiply( \
+        #     tf.transformations.quaternion_multiply(vel_ENU, self.orientation),
+        #     tf.transformations.quaternion_conjugate(self.orientation))
+        u = self.orientation[:3]
+        s = self.orientation[3]
+        v = [inspvas.east_velocity, inspvas.north_velocity, inspvas.up_velocity]
+        vel = 2.0*dot(u, v)*u + multiply((s*s - dot(u, u)), v) + 2.0*s*cross(u, v)
+        # print("Vel_ENU: ",vel_ENU, ", Vel_Truck: ",vel, ", : ", test)       
+        odom.twist.twist.linear.x = -vel[0]
+        odom.twist.twist.linear.y = -vel[1]
         odom.twist.twist.linear.z = vel[2]
-
         # odom.twist.twist.linear.x = inspvas.east_velocity
         # odom.twist.twist.linear.y = inspvas.north_velocity
         # odom.twist.twist.linear.z = inspvas.up_velocity
         odom.twist.covariance = TWIST_COVAR
 
         self.pub_odom.publish(odom)
+        trailer_pose_data = PoseStamped()
+        trailer_pose_data.header.stamp = rospy.Time.now()
+        trailer_pose_data.header.frame_id = self.base_frame
+        self.trailer_yaw = pi2pi(self.trailer_yaw + \
+            odom.twist.twist.linear.x*self.dt/self.LT*sin(self.orientation[2] - self.trailer_yaw))
+        trailer_pose_data.pose.orientation = Quaternion(*tf.transformations.quaternion_from_euler(
+            0.0, 0.0, self.trailer_yaw))
+        self.pub_trailer_pose.publish(trailer_pose_data)
+
 
         # Odometry transform (if required)
         if self.publish_tf:
@@ -443,3 +463,6 @@ class NovatelPublisher(object):
 
         # TODO: Supply this data in the IMU and Odometry messages.
         pass
+
+def pi2pi(phases):
+   return (phases + pi) % (2 * pi) - pi

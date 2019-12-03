@@ -58,7 +58,7 @@
     <param name="/vehicle/front_edge" type="double" value="1.35"/>
     <param name="/vehicle/back_edge" type="double" value="1.85"/>
     <param name="/vehicle/width" type="double" value="2.42"/>
-    <param name="/vehicle/trailer_wheelbase" type="double" value="7.8"/>
+    <param name="/vehicle/trailer_wheelbase" type="double" value="10.9"/>
     <param name="/vehicle/trailer_front_edge" type="double" value="1.35"/>
     <param name="/vehicle/trailer_back_edge" type="double" value="1.5"/>
     <param name="/vehicle/max_lat_accel" type="double" value="2.0"/>
