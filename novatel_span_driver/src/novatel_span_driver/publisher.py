@@ -27,7 +27,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import rospy
-import tf
+from tf.transformations import quaternion_from_euler, quaternion_matrix
 import tf2_ros
 import geodesy.utm
 
@@ -37,7 +37,7 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Quaternion, Point, Pose, Twist, PoseStamped, TransformStamped
 
 from math import radians, pow, sin
-from numpy import cross, dot, multiply, pi
+from numpy import cross, dot, multiply, pi, matrix
 
 # FIXED COVARIANCES
 # TODO: Work these out...
@@ -238,7 +238,7 @@ class NovatelPublisher(object):
             # Orientation
             # Save this on an instance variable, so that it can be published
             # with the IMU message as well.
-            self.orientation = tf.transformations.quaternion_from_euler(
+            self.orientation = quaternion_from_euler(
                     radians(inspvax.roll),
                     radians(inspvax.pitch),
                     -radians(inspvax.azimuth), 'syxz')
@@ -295,10 +295,10 @@ class NovatelPublisher(object):
             
         # Orientation
         # Save this on an instance variable, so that it can be published
-        self.orientation = tf.transformations.quaternion_from_euler(
-                radians(inspvas.roll),
-                radians(inspvas.pitch),
-                -radians(inspvas.azimuth), 'syxz')
+        self.orientation = quaternion_from_euler(
+            radians(inspvas.roll),
+            radians(inspvas.pitch),
+            -radians(inspvas.azimuth), 'syxz')
 
         if not self.initS and self.zero_start:
             self.usingINSPVAS = True
@@ -349,14 +349,17 @@ class NovatelPublisher(object):
         # Twist is relative to vehicle frame
         # https://gamedev.stackexchange.com/questions/28395/rotating-vector3-by-a-quaternion
         # vel_ENU = [inspvas.east_velocity, inspvas.north_velocity, inspvas.up_velocity, 0.0]
-        # vel = tf.transformations.quaternion_multiply( \
-        #     tf.transformations.quaternion_multiply(vel_ENU, self.orientation),
-        #     tf.transformations.quaternion_conjugate(self.orientation))
+        # vel = quaternion_multiply( 
+        #     quaternion_multiply(vel_ENU, self.orientation),
+        #     quaternion_conjugate(self.orientation))
         u = self.orientation[:3]
         s = self.orientation[3]
         v = [inspvas.east_velocity, inspvas.north_velocity, inspvas.up_velocity]
         vel = 2.0*dot(u, v)*u + multiply((s*s - dot(u, u)), v) + 2.0*s*cross(u, v)
-        # print("Vel_ENU: ",vel_ENU, ", Vel_Truck: ",vel, ", : ", test)       
+        v_test = matrix([inspvas.east_velocity, inspvas.north_velocity, inspvas.up_velocity, 1])
+        v_test.resize((4, 1))
+        test = quaternion_matrix(self.orientation)*v_test
+        print("Vel_ENU: ", v, ", Vel_Truck: ", vel, ", Vel_test: ", test)       
         odom.twist.twist.linear.x = -vel[0]
         odom.twist.twist.linear.y = -vel[1]
         odom.twist.twist.linear.z = vel[2]
@@ -371,7 +374,7 @@ class NovatelPublisher(object):
         trailer_pose_data.header.frame_id = self.base_frame
         self.trailer_yaw = pi2pi(self.trailer_yaw + \
             odom.twist.twist.linear.x*self.dt/self.LT*sin(self.orientation[2] - self.trailer_yaw))
-        trailer_pose_data.pose.orientation = Quaternion(*tf.transformations.quaternion_from_euler(
+        trailer_pose_data.pose.orientation = Quaternion(*quaternion_from_euler(
             0.0, 0.0, self.trailer_yaw))
         self.pub_trailer_pose.publish(trailer_pose_data)
 
