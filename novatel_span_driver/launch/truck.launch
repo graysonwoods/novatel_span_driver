@@ -64,7 +64,7 @@
     <param name="/vehicle/max_lat_accel" type="double" value="2.0"/>
     <param name="/vehicle/max_long_decel" type="double" value="2.0"/>
     <param name="/vehicle/max_long_accel" type="double" value="0.6"/>
-    <param name="/vehicle/stanley_kp" type="double" value="0.08"/>
+    <param name="/vehicle/stanley_kp" type="double" value="0.6"/>
     <param name="/vehicle/long_kp" type="double" value="0.12"/>
     <param name="/vehicle/long_ki" type="double" value="0.02"/>
     <!--<node pkg="tf" type="static_transform_publisher" name="map2odom" args="1 0 0 0 0 0 1 map odom 100" /> -->
