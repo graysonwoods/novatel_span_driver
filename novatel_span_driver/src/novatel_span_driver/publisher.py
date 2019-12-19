@@ -333,7 +333,8 @@ class NovatelPublisher(object):
                 self.mto.transform.rotation.y = self.map_orientation[1]
                 self.mto.transform.rotation.z = self.map_orientation[2]
                 self.mto.transform.rotation.w = self.map_orientation[3]
-                self.trailer_yaw = self.orientation[2]
+                self.trailer_yaw = -radians(inspvas.azimuth)
+                print("Initial trailer angle: ", self.trailer_yaw)
                 self.tf_broadcast_map.sendTransform(self.mto)
 
         odom = Odometry()
@@ -375,7 +376,10 @@ class NovatelPublisher(object):
         self.trailer_yaw = pi2pi(self.trailer_yaw + sqrt(vel[0]*vel[0] + \
             vel[1]*vel[1])*self.dt/self.LT*sin(-radians(inspvas.azimuth) - self.trailer_yaw))
         trailer_pose_data.pose.orientation = Quaternion(*quaternion_from_euler(
-            0.0, 0.0, self.trailer_yaw))
+            radians(inspvas.roll),
+            radians(inspvas.pitch),
+            self.trailer_yaw + radians(inspvas.azimuth)))
+        # print("trailer yaw: ", self.trailer_yaw, ", truck yaw: ", -radians(inspvas.azimuth))
         self.pub_trailer_pose.publish(trailer_pose_data)
 
 
