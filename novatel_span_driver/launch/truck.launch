@@ -52,6 +52,7 @@
     <param name="/scenario" value="lane_change"/>
     <param name="/vehicle/steering_ratio" type="double" value="25.6"/>
     <param name="/vehicle/control_rate" type="double" value="30.0"/>
+    <param name="/vehicle/sensor_rate" type="double" value="50.0"/>
     <param name="/vehicle/max_steering" type="double" value="11.0"/>
     <param name="/vehicle/max_steering_rate" type="double" value="3.5"/>
     <param name="/vehicle/wheelbase" type="double" value="5.81"/>

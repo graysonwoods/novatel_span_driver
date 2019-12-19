@@ -36,7 +36,7 @@ from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Quaternion, Point, Pose, Twist, PoseStamped, TransformStamped
 
-from math import radians, pow, sin
+from math import radians, pow, sin, sqrt
 from numpy import cross, dot, multiply, pi, matrix
 
 # FIXED COVARIANCES
@@ -90,7 +90,7 @@ class NovatelPublisher(object):
         # first coordinate received.
         self.zero_start = rospy.get_param('~zero_start', False)
 
-        self.imu_rate = rospy.get_param('~rate', 125)
+        self.imu_rate = rospy.get_param('/vehicle/imu_rate', 125.0)
 
         # Topic publishers
         self.pub_imu = rospy.Publisher('imu/data', Imu, queue_size=1)
@@ -356,10 +356,10 @@ class NovatelPublisher(object):
         s = self.orientation[3]
         v = [inspvas.east_velocity, inspvas.north_velocity, inspvas.up_velocity]
         vel = 2.0*dot(u, v)*u + multiply((s*s - dot(u, u)), v) + 2.0*s*cross(u, v)
-        v_test = matrix([inspvas.east_velocity, inspvas.north_velocity, inspvas.up_velocity, 1])
-        v_test.resize((4, 1))
-        test = quaternion_matrix(self.orientation)*v_test
-        print("Vel_ENU: ", v, ", Vel_Truck: ", vel, ", Vel_test: ", test)       
+        # v_test = matrix([inspvas.east_velocity, inspvas.north_velocity, inspvas.up_velocity, 1])
+        # v_test.resize((4, 1))
+        # test = quaternion_matrix(self.orientation)*v_test
+        # print("Vel_ENU: ", v, ", Vel_Truck: ", vel, ", Vel_test: ", test)       
         odom.twist.twist.linear.x = -vel[0]
         odom.twist.twist.linear.y = -vel[1]
         odom.twist.twist.linear.z = vel[2]
@@ -372,8 +372,8 @@ class NovatelPublisher(object):
         trailer_pose_data = PoseStamped()
         trailer_pose_data.header.stamp = rospy.Time.now()
         trailer_pose_data.header.frame_id = self.base_frame
-        self.trailer_yaw = pi2pi(self.trailer_yaw + \
-            odom.twist.twist.linear.x*self.dt/self.LT*sin(self.orientation[2] - self.trailer_yaw))
+        self.trailer_yaw = pi2pi(self.trailer_yaw + sqrt(vel[0]*vel[0] + \
+            vel[1]*vel[1])*self.dt/self.LT*sin(-radians(inspvas.azimuth) - self.trailer_yaw))
         trailer_pose_data.pose.orientation = Quaternion(*quaternion_from_euler(
             0.0, 0.0, self.trailer_yaw))
         self.pub_trailer_pose.publish(trailer_pose_data)
