@@ -310,12 +310,16 @@ class NovatelPublisher(object):
             #Publish tf between map and odom
             if self.scenario == "seaport":
                 rospy.loginfo("Scenario: Scenario")
-                utm_map = geodesy.utm.fromLatLong(30.63518, -96.47684)
+                # utm_map = geodesy.utm.fromLatLong(30.63518, -96.47684)
+                utm_map = geodesy.utm.UTMPoint(easting=741645.336, \
+                northing=3391645.560, band="14R")
             elif self.scenario == "lane_change":
                 rospy.loginfo("Scenario: Lane Change")
                 # utm_map = geodesy.utm.fromLatLong(30.626184, -96.481977)
-                utm_map = geodesy.utm.UTMPoint(easting=741356.036, \
-                northing=3390791.560, band="14R")
+                # utm_map = geodesy.utm.UTMPoint(easting=741356.036, \
+                # northing=3390791.560, band="14R")
+                utm_map = geodesy.utm.UTMPoint(easting=741351.736, \
+                northing=3390690.560, band="14R")
                 # print("Map: ",utm_map.toPoint(), ", Actual: ", utm_pos.toPoint())
                 # utm_map.easting = 741356.036
                 # utm_map.northing = 3390791.560
